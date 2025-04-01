@@ -1,15 +1,12 @@
-
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 import os
-from datetime import datetime
 import json
 
-# Archivo donde se guardará la sesión y el historial
+# Archivo donde se guardará la sesión
 SESSION_FILE = "productos_sesion.json"
-HISTORY_FILE = "historial_productos.json"
 
 # Función para guardar la sesión actual
 def save_session(show_alert=True):
@@ -276,107 +273,3 @@ root.mainloop()
 
 load_session()
 root.mainloop()
-
-# Función para guardar el historial de productos ingresados
-def save_to_history(product_name, weight):
-    timestamp = datetime.now().strftime("%Y-%m-%d")
-    try:
-        if os.path.exists(HISTORY_FILE):
-            with open(HISTORY_FILE, "r") as file:
-                history = json.load(file)
-        else:
-            history = {}
-
-        if timestamp not in history:
-            history[timestamp] = []
-
-        history[timestamp].append({"producto": product_name, "peso": weight})
-
-        with open(HISTORY_FILE, "w") as file:
-            json.dump(history, file, indent=4)
-    except Exception as e:
-        messagebox.showerror("Error", f"No se pudo guardar en el historial: {str(e)}")
-
-# Función para ver el historial de productos
-def view_history():
-    if not os.path.exists(HISTORY_FILE):
-        messagebox.showinfo("Historial vacío", "No hay datos en el historial aún.")
-        return
-
-    history_window = tk.Toplevel(root)
-    history_window.title("Historial de Productos")
-    history_window.geometry("500x400")
-
-    tree = ttk.Treeview(history_window, columns=("Fecha", "Producto", "Peso"), show="headings")
-    tree.heading("Fecha", text="Fecha")
-    tree.heading("Producto", text="Producto")
-    tree.heading("Peso", text="Peso (lb)")
-    tree.column("Fecha", width=100)
-    tree.column("Producto", width=250)
-    tree.column("Peso", width=100)
-    tree.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
-
-    try:
-        with open(HISTORY_FILE, "r") as file:
-            history = json.load(file)
-        for date, entries in history.items():
-            for entry in entries:
-                tree.insert("", "end", values=(date, entry["producto"], f"{entry['peso']:.2f} lb"))
-    except Exception as e:
-        messagebox.showerror("Error", f"No se pudo cargar el historial: {str(e)}")
-
-# Modificar la función para añadir productos y registrar en historial
-def add_product(event=None):
-    product_name = product_name_entry.get().strip()
-    try:
-        weight = float(product_weight_entry.get())
-        if product_name == "":
-            messagebox.showerror("Error", "El nombre del producto no puede estar vacío.")
-            return
-        if weight <= 0:
-            messagebox.showerror("Error", "El peso debe ser mayor a 0.")
-            return
-
-        if product_name in products:
-            products[product_name] += weight
-        else:
-            products[product_name] = weight
-            product_names.add(product_name)
-
-        save_to_history(product_name, weight)  # Guardar en historial
-        update_product_list()
-        update_total_weight()
-        product_name_entry.delete(0, tk.END)
-        product_weight_entry.delete(0, tk.END)
-        product_name_entry.focus()
-    except ValueError:
-        messagebox.showerror("Error", "El peso debe ser un número válido.")
-
-# Agregar botón en el menú lateral para ver historial
-buttons.append(("Ver Historial", view_history))
-
-# Función para ver el historial en formato JSON
-def view_history_json():
-    if not os.path.exists(HISTORY_FILE):
-        messagebox.showinfo("Historial vacío", "No hay datos en el historial aún.")
-        return
-
-    try:
-        with open(HISTORY_FILE, "r") as file:
-            history = json.load(file)
-
-        history_window = tk.Toplevel(root)
-        history_window.title("Historial (JSON)")
-        history_window.geometry("600x400")
-
-        text_area = tk.Text(history_window, wrap="word")
-        text_area.pack(expand=True, fill="both", padx=10, pady=10)
-
-        text_area.insert("1.0", json.dumps(history, indent=4))
-        text_area.config(state="disabled")  # Hacerlo de solo lectura
-
-    except Exception as e:
-        messagebox.showerror("Error", f"No se pudo cargar el historial: {str(e)}")
-
-# Agregar botón en el menú lateral para ver historial JSON
-buttons.append(("Ver Historial (JSON)", view_history_json))
