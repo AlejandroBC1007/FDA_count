@@ -4,6 +4,7 @@ from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 import os
 import json
+from datetime import datetime
 
 # Archivo donde se guardará la sesión
 SESSION_FILE = "productos_sesion.json"
@@ -14,10 +15,9 @@ def save_session(show_alert=True):
         with open(SESSION_FILE, "w") as file:
             json.dump(products, file)
         if show_alert:
-            messagebox.showinfo("Éxito", "La sesión se ha guardado correctamente.")  # Solo si es manual
+            messagebox.showinfo("Éxito", "La sesión se ha guardado correctamente.")
     except Exception as e:
         messagebox.showerror("Error", f"No se pudo guardar la sesión: {str(e)}")
-
 
 # Función para cargar la sesión al iniciar
 def load_session():
@@ -51,9 +51,11 @@ def add_product(event=None):
 
         if product_name in products:
             products[product_name] += weight
+            add_to_history("Modificado", f"{product_name} - +{weight:.2f} lb")
         else:
             products[product_name] = weight
             product_names.add(product_name)
+            add_to_history("Añadido", f"{product_name} - {weight:.2f} lb")
 
         update_product_list()
         update_total_weight()
@@ -106,6 +108,8 @@ def export_to_pdf():
 # Función para limpiar la lista de productos
 def clear_list():
     if messagebox.askyesno("Confirmar", "¿Estás seguro de que deseas limpiar la lista?"):
+        for product in products.keys():
+            add_to_history("Eliminado", f"{product} - {products[product]:.2f} lb")
         products.clear()
         product_names.clear()
         update_product_list()
@@ -122,6 +126,7 @@ def delete_selected():
         for item in selected_items:
             product_name = product_list.item(item)["values"][0]
             if product_name in products:
+                add_to_history("Eliminado", f"{product_name} - {products[product_name]:.2f} lb")
                 del products[product_name]
                 product_names.discard(product_name)
         update_product_list()
@@ -136,7 +141,6 @@ def edit_product():
     product_name = product_list.item(selected_item[0])["values"][0]
     current_weight = products[product_name]
 
-    # Crear nueva ventana para editar
     edit_window = tk.Toplevel(root)
     edit_window.title("Editar Producto")
     edit_window.geometry("300x200")
@@ -169,6 +173,8 @@ def edit_product():
             products[new_name] = new_weight
             product_names.add(new_name)
 
+            add_to_history("Editado", f"{product_name} → {new_name} - {new_weight:.2f} lb")
+
             update_product_list()
             update_total_weight()
             edit_window.destroy()
@@ -177,15 +183,44 @@ def edit_product():
 
     ttk.Button(edit_window, text="Guardar Cambios", command=save_edit).pack(pady=20)
 
+# Función para registrar acciones en el historial
+history_log = []
+
+def add_to_history(action, details):
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    history_log.append({"fecha": timestamp.split()[0], "hora": timestamp.split()[1], "accion": action, "detalles": details})
+
+# Función para mostrar el historial
+def show_history():
+    if not history_log:
+        messagebox.showinfo("Historial", "No hay acciones registradas.")
+        return
+
+    history_window = tk.Toplevel(root)
+    history_window.title("Historial de Acciones")
+    history_window.geometry("500x400")
+    history_window.transient(root)
+
+    text_widget = tk.Text(history_window, wrap="word", font=("Arial", 11))
+    text_widget.pack(expand=True, fill="both", padx=10, pady=10)
+
+    text_widget.insert("end", "=== HISTORIAL DE ACCIONES ===\n\n")
+
+    last_date = ""
+    for entry in history_log:
+        if entry["fecha"] != last_date:
+            last_date = entry["fecha"]
+            text_widget.insert("end", f"\n📅 {last_date}:\n")
+
+        text_widget.insert("end", f"  🕑 {entry['hora']} - {entry['accion']}: {entry['detalles']}\n")
+
+    text_widget.config(state="disabled")
+
 # Configuración de la ventana principal
 root = tk.Tk()
 root.title("FDA")
 root.geometry("800x600")
 root.minsize(600, 400)
-
-# Establecer el icono
-icon_path = r"C:\Users\oab10\Documents\BonCort Program\fda.ico"
-root.iconbitmap(icon_path)
 
 products = {}
 product_names = set()
@@ -210,6 +245,7 @@ buttons = [
     ("Eliminar Producto", delete_selected),
     ("Editar Producto", edit_product),
     ("Guardar Sesión", save_session),
+    ("Ver Historial", show_history),
     ("Salir", root.quit),
 ]
 
@@ -218,11 +254,9 @@ for i, (text, command) in enumerate(buttons):
     btn.pack(fill="x", pady=5)
     tk.Frame(menu_frame, height=2, bg="white").pack(fill="x")  # Línea blanca debajo
 
-    # Añadir hover
     btn.bind("<Enter>", lambda e, b=btn: b.config(bg="#5679d6"))
     btn.bind("<Leave>", lambda e, b=btn: b.config(bg="#333333"))
 
-# Frame superior para entradas
 frame_top = tk.Frame(root, bg="#E0E0E0")
 frame_top.grid(row=0, column=1, padx=10, pady=10, sticky="ew")
 
@@ -237,7 +271,6 @@ product_weight_entry.grid(row=1, column=1, padx=5, pady=5)
 add_button = ttk.Button(frame_top, text="Añadir Producto", command=add_product)
 add_button.grid(row=2, column=0, columnspan=2, pady=10)
 
-# Lista de productos
 product_list = ttk.Treeview(root, columns=("Producto", "Peso Total"), show="headings", height=15)
 product_list.heading("Producto", text="Producto")
 product_list.heading("Peso Total", text="Peso Total")
@@ -245,7 +278,6 @@ product_list.column("Producto", width=200)
 product_list.column("Peso Total", width=100)
 product_list.grid(row=1, column=1, padx=10, pady=10, sticky="nsew")
 
-# Etiqueta para mostrar el peso total
 total_weight_label = tk.Label(root, text="Peso Total: 0.00 lb", font=("Arial", 12, "bold"), bg="#E0E0E0")
 total_weight_label.grid(row=2, column=1, pady=10)
 
@@ -255,21 +287,11 @@ root.grid_columnconfigure(1, weight=1)
 product_name_entry.bind("<Return>", lambda e: product_weight_entry.focus())
 product_weight_entry.bind("<Return>", add_product)
 
-# Función para autoguardar la sesión cada 10 segundos
 def auto_save():
-    if root.winfo_exists():  # Verifica si la ventana aún está abierta
+    if root.winfo_exists():
         save_session(False)  
-        root.after(10000, auto_save)  # Se programa el siguiente autoguardado
-        
-
-# Cargar la sesión anterior si existe
-load_session()
-
-# Iniciar el autoguardado en segundo plano
-root.after(10000, auto_save)  # Primera ejecución tras 10 segundos
-
-# Iniciar la interfaz gráfica
-root.mainloop()
+        root.after(10000, auto_save)
 
 load_session()
+root.after(10000, auto_save)
 root.mainloop()
