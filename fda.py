@@ -132,7 +132,7 @@ def delete_selected():
         update_product_list()
         update_total_weight()
 
-# Función para editar un producto
+# Función para editar un producto (nombre y restar peso, con validación de nombres duplicados)
 def edit_product():
     selected_item = product_list.selection()
     if len(selected_item) != 1:
@@ -143,43 +143,60 @@ def edit_product():
 
     edit_window = tk.Toplevel(root)
     edit_window.title("Editar Producto")
-    edit_window.geometry("300x200")
+    edit_window.geometry("350x250")
     edit_window.transient(root)
 
-    tk.Label(edit_window, text="Nuevo Nombre:").pack(pady=10)
+    tk.Label(edit_window, text=f"Producto actual: {product_name}", font=("Arial", 11, "bold")).pack(pady=5)
+    tk.Label(edit_window, text=f"Peso actual: {current_weight:.2f} lb", font=("Arial", 11)).pack(pady=5)
+
+    # Campo para cambiar nombre
+    tk.Label(edit_window, text="Nuevo Nombre:").pack(pady=5)
     new_name_entry = ttk.Entry(edit_window)
     new_name_entry.pack(pady=5)
     new_name_entry.insert(0, product_name)
 
-    tk.Label(edit_window, text="Nuevo Peso (lb):").pack(pady=10)
-    new_weight_entry = ttk.Entry(edit_window)
-    new_weight_entry.pack(pady=5)
-    new_weight_entry.insert(0, str(current_weight))
+    # Campo para restar peso
+    tk.Label(edit_window, text="Restar peso (lb):").pack(pady=5)
+    subtract_weight_entry = ttk.Entry(edit_window)
+    subtract_weight_entry.pack(pady=5)
 
     def save_edit():
-        new_name = new_name_entry.get().strip()
+        new_name = new_name_entry.get().strip() or product_name
         try:
-            new_weight = float(new_weight_entry.get())
-            if new_name == "":
-                messagebox.showerror("Error", "El nombre del producto no puede estar vacío.")
-                return
-            if new_weight <= 0:
-                messagebox.showerror("Error", "El peso debe ser mayor a 0.")
+            final_weight = current_weight
+
+            # Restar peso si se ingresó
+            if subtract_weight_entry.get().strip():
+                subtract_value = float(subtract_weight_entry.get())
+                if subtract_value < 0:
+                    messagebox.showerror("Error", "No se puede restar un valor negativo.")
+                    return
+                final_weight -= subtract_value
+
+                add_to_history("Peso Restado", f"{product_name} - {subtract_value:.2f} lb (Nuevo peso: {final_weight:.2f} lb)")
+
+            if final_weight <= 0:
+                messagebox.showerror("Error", "El peso final debe ser mayor a 0.")
                 return
 
+            # Eliminar producto original
             del products[product_name]
             product_names.discard(product_name)
 
-            products[new_name] = new_weight
-            product_names.add(new_name)
-
-            add_to_history("Editado", f"{product_name} → {new_name} - {new_weight:.2f} lb")
+            # Si el nuevo nombre ya existe, sumamos el peso
+            if new_name in products:
+                products[new_name] += final_weight
+                add_to_history("Peso Sumado", f"{product_name} → {new_name} - +{final_weight:.2f} lb (Total: {products[new_name]:.2f} lb)")
+            else:
+                products[new_name] = final_weight
+                product_names.add(new_name)
+                add_to_history("Editado", f"{product_name} → {new_name} - {final_weight:.2f} lb")
 
             update_product_list()
             update_total_weight()
             edit_window.destroy()
         except ValueError:
-            messagebox.showerror("Error", "El peso debe ser un número válido.")
+            messagebox.showerror("Error", "Por favor ingrese valores numéricos válidos.")
 
     ttk.Button(edit_window, text="Guardar Cambios", command=save_edit).pack(pady=20)
 
@@ -201,8 +218,16 @@ def show_history():
     history_window.geometry("500x400")
     history_window.transient(root)
 
-    text_widget = tk.Text(history_window, wrap="word", font=("Arial", 11))
+    frame = tk.Frame(history_window)
+    frame.pack(expand=True, fill="both")
+
+    scrollbar = tk.Scrollbar(frame)
+    scrollbar.pack(side="right", fill="y")
+
+    text_widget = tk.Text(frame, wrap="word", font=("Arial", 11), yscrollcommand=scrollbar.set)
     text_widget.pack(expand=True, fill="both", padx=10, pady=10)
+
+    scrollbar.config(command=text_widget.yview)
 
     text_widget.insert("end", "=== HISTORIAL DE ACCIONES ===\n\n")
 
