@@ -37,6 +37,24 @@ def update_total_weight():
     total_weight = sum(products.values())  # Suma todos los pesos
     total_weight_label.config(text=f"Peso Total: {total_weight:.2f} lb")
 
+# Pila para deshacer cambios
+undo_stack = []
+
+def save_undo_state():
+    undo_stack.append(products.copy())
+
+def undo_action(event=None):
+    if not undo_stack:
+        messagebox.showinfo("Deshacer", "No hay acciones para deshacer.")
+        return
+    last_state = undo_stack.pop()
+    global products, product_names
+    products = last_state
+    product_names = set(products.keys())
+    update_product_list()
+    update_total_weight()
+    messagebox.showinfo("Deshacer", "Última acción revertida.")
+
 # Función para añadir productos a la lista
 def add_product(event=None):
     product_name = product_name_entry.get().strip()
@@ -48,6 +66,8 @@ def add_product(event=None):
         if weight <= 0:
             messagebox.showerror("Error", "El peso debe ser mayor a 0.")
             return
+
+        save_undo_state()  # Guardamos estado antes de modificar
 
         if product_name in products:
             products[product_name] += weight
@@ -108,6 +128,7 @@ def export_to_pdf():
 # Función para limpiar la lista de productos
 def clear_list():
     if messagebox.askyesno("Confirmar", "¿Estás seguro de que deseas limpiar la lista?"):
+        save_undo_state()  # Guardamos estado antes de limpiar
         for product in products.keys():
             add_to_history("Eliminado", f"{product} - {products[product]:.2f} lb")
         products.clear()
@@ -123,6 +144,7 @@ def delete_selected():
         messagebox.showerror("Error", "Selecciona al menos un producto para eliminar.")
         return
     if messagebox.askyesno("Confirmar", "¿Está seguro que quiere eliminar el producto seleccionado?"):
+        save_undo_state()  # Guardamos estado antes de eliminar
         for item in selected_items:
             product_name = product_list.item(item)["values"][0]
             if product_name in products:
@@ -132,7 +154,7 @@ def delete_selected():
         update_product_list()
         update_total_weight()
 
-# Función para editar un producto (nombre y restar peso, con validación de nombres duplicados)
+# Función para editar un producto (nombre, restar peso y peso nuevo)
 def edit_product():
     selected_item = product_list.selection()
     if len(selected_item) != 1:
@@ -143,22 +165,27 @@ def edit_product():
 
     edit_window = tk.Toplevel(root)
     edit_window.title("Editar Producto")
-    edit_window.geometry("350x250")
+    edit_window.geometry("550x450")  # Ventana más grande
     edit_window.transient(root)
 
-    tk.Label(edit_window, text=f"Producto actual: {product_name}", font=("Arial", 11, "bold")).pack(pady=5)
-    tk.Label(edit_window, text=f"Peso actual: {current_weight:.2f} lb", font=("Arial", 11)).pack(pady=5)
+    tk.Label(edit_window, text=f"Producto actual: {product_name}", font=("Arial", 12, "bold")).pack(pady=5)
+    tk.Label(edit_window, text=f"Peso actual: {current_weight:.2f} lb", font=("Arial", 12)).pack(pady=5)
 
     # Campo para cambiar nombre
     tk.Label(edit_window, text="Nuevo Nombre:").pack(pady=5)
-    new_name_entry = ttk.Entry(edit_window)
-    new_name_entry.pack(pady=5)
+    new_name_entry = ttk.Entry(edit_window, font=("Arial", 11))
+    new_name_entry.pack(pady=5, ipadx=5, ipady=5)
     new_name_entry.insert(0, product_name)
 
     # Campo para restar peso
     tk.Label(edit_window, text="Restar peso (lb):").pack(pady=5)
-    subtract_weight_entry = ttk.Entry(edit_window)
-    subtract_weight_entry.pack(pady=5)
+    subtract_weight_entry = ttk.Entry(edit_window, font=("Arial", 11))
+    subtract_weight_entry.pack(pady=5, ipadx=5, ipady=5)
+
+    # Campo para ingresar peso nuevo directamente
+    tk.Label(edit_window, text="Peso Nuevo (lb):").pack(pady=5)
+    new_weight_entry = ttk.Entry(edit_window, font=("Arial", 11))
+    new_weight_entry.pack(pady=5, ipadx=5, ipady=5)
 
     def save_edit():
         new_name = new_name_entry.get().strip() or product_name
@@ -172,12 +199,22 @@ def edit_product():
                     messagebox.showerror("Error", "No se puede restar un valor negativo.")
                     return
                 final_weight -= subtract_value
-
                 add_to_history("Peso Restado", f"{product_name} - {subtract_value:.2f} lb (Nuevo peso: {final_weight:.2f} lb)")
+
+            # Reemplazar con peso nuevo si se ingresó
+            if new_weight_entry.get().strip():
+                new_weight = float(new_weight_entry.get())
+                if new_weight <= 0:
+                    messagebox.showerror("Error", "El peso nuevo debe ser mayor a 0.")
+                    return
+                final_weight = new_weight
+                add_to_history("Peso Reemplazado", f"{product_name} → {new_name} - {final_weight:.2f} lb")
 
             if final_weight <= 0:
                 messagebox.showerror("Error", "El peso final debe ser mayor a 0.")
                 return
+
+            save_undo_state()  # Guardamos estado antes de editar
 
             # Eliminar producto original
             del products[product_name]
@@ -198,7 +235,8 @@ def edit_product():
         except ValueError:
             messagebox.showerror("Error", "Por favor ingrese valores numéricos válidos.")
 
-    ttk.Button(edit_window, text="Guardar Cambios", command=save_edit).pack(pady=20)
+    # Botón más grande y visible
+    ttk.Button(edit_window, text="Guardar Cambios", command=save_edit).pack(pady=30, ipadx=15, ipady=8)
 
 # Función para registrar acciones en el historial
 history_log = []
@@ -278,7 +316,6 @@ for i, (text, command) in enumerate(buttons):
     btn = tk.Button(menu_frame, text=text, command=command, bg="#333333", fg="white", font=("Arial", 10), relief="flat")
     btn.pack(fill="x", pady=5)
     tk.Frame(menu_frame, height=2, bg="white").pack(fill="x")  # Línea blanca debajo
-
     btn.bind("<Enter>", lambda e, b=btn: b.config(bg="#5679d6"))
     btn.bind("<Leave>", lambda e, b=btn: b.config(bg="#333333"))
 
@@ -311,6 +348,9 @@ root.grid_columnconfigure(1, weight=1)
 
 product_name_entry.bind("<Return>", lambda e: product_weight_entry.focus())
 product_weight_entry.bind("<Return>", add_product)
+
+# Ctrl+Z para deshacer
+root.bind("<Control-z>", undo_action)
 
 def auto_save():
     if root.winfo_exists():
