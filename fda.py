@@ -88,7 +88,8 @@ def add_product(event=None):
 # Función para actualizar la lista de productos mostrada
 def update_product_list():
     product_list.delete(*product_list.get_children())
-    for product, weight in products.items():
+    # 🔹 Orden alfabético añadido
+    for product, weight in sorted(products.items(), key=lambda x: x[0].lower()):
         product_list.insert("", "end", values=(product, f"{weight:.2f} lb"))
 
 # Función para exportar la lista a un PDF
@@ -112,7 +113,8 @@ def export_to_pdf():
         pdf.drawString(30, 730, "-" * 50)
 
         y_position = 710
-        for product, weight in products.items():
+        # 🔹 Exportar también en orden alfabético
+        for product, weight in sorted(products.items(), key=lambda x: x[0].lower()):
             pdf.drawString(30, y_position, f"{product}: {weight:.2f} lb")
             y_position -= 20
             if y_position < 50:
