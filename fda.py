@@ -34,12 +34,11 @@ def load_session():
 
 # Función para calcular y actualizar el peso total
 def update_total_weight():
-    total_weight = sum(products.values())  # Suma todos los pesos
+    total_weight = sum(products.values())
     total_weight_label.config(text=f"Peso Total: {total_weight:.2f} lb")
 
 # Pila para deshacer cambios
 undo_stack = []
-
 def save_undo_state():
     undo_stack.append(products.copy())
 
@@ -55,7 +54,7 @@ def undo_action(event=None):
     update_total_weight()
     messagebox.showinfo("Deshacer", "Última acción revertida.")
 
-# Función para añadir productos a la lista
+# Función para añadir productos
 def add_product(event=None):
     product_name = product_name_entry.get().strip()
     try:
@@ -67,8 +66,7 @@ def add_product(event=None):
             messagebox.showerror("Error", "El peso debe ser mayor a 0.")
             return
 
-        save_undo_state()  # Guardamos estado antes de modificar
-
+        save_undo_state()
         if product_name in products:
             products[product_name] += weight
             add_to_history("Modificado", f"{product_name} - +{weight:.2f} lb")
@@ -85,14 +83,14 @@ def add_product(event=None):
     except ValueError:
         messagebox.showerror("Error", "El peso debe ser un número válido.")
 
-# Función para actualizar la lista de productos mostrada
+# Actualizar lista de productos (orden alfabético)
 def update_product_list():
     product_list.delete(*product_list.get_children())
-    # 🔹 Orden alfabético añadido
-    for product, weight in sorted(products.items(), key=lambda x: x[0].lower()):
+    for product in sorted(products.keys()):
+        weight = products[product]
         product_list.insert("", "end", values=(product, f"{weight:.2f} lb"))
 
-# Función para exportar la lista a un PDF
+# Exportar a PDF
 def export_to_pdf():
     if not products:
         messagebox.showerror("Error", "No hay productos para exportar.")
@@ -111,26 +109,24 @@ def export_to_pdf():
         pdf.setFont("Helvetica", 12)
         pdf.drawString(30, 750, "Lista de Productos")
         pdf.drawString(30, 730, "-" * 50)
-
         y_position = 710
-        # 🔹 Exportar también en orden alfabético
-        for product, weight in sorted(products.items(), key=lambda x: x[0].lower()):
+        for product in sorted(products.keys()):
+            weight = products[product]
             pdf.drawString(30, y_position, f"{product}: {weight:.2f} lb")
             y_position -= 20
             if y_position < 50:
                 pdf.showPage()
                 pdf.setFont("Helvetica", 12)
                 y_position = 750
-
         pdf.save()
         messagebox.showinfo("Éxito", f"Lista exportada a {file_path}")
     except Exception as e:
         messagebox.showerror("Error", f"No se pudo exportar el PDF: {str(e)}")
 
-# Función para limpiar la lista de productos
+# Limpiar lista
 def clear_list():
     if messagebox.askyesno("Confirmar", "¿Estás seguro de que deseas limpiar la lista?"):
-        save_undo_state()  # Guardamos estado antes de limpiar
+        save_undo_state()
         for product in products.keys():
             add_to_history("Eliminado", f"{product} - {products[product]:.2f} lb")
         products.clear()
@@ -139,14 +135,14 @@ def clear_list():
         update_total_weight()
         messagebox.showinfo("Éxito", "La lista ha sido despejada.")
 
-# Función para eliminar productos seleccionados
+# Eliminar producto
 def delete_selected():
     selected_items = product_list.selection()
     if not selected_items:
         messagebox.showerror("Error", "Selecciona al menos un producto para eliminar.")
         return
     if messagebox.askyesno("Confirmar", "¿Está seguro que quiere eliminar el producto seleccionado?"):
-        save_undo_state()  # Guardamos estado antes de eliminar
+        save_undo_state()
         for item in selected_items:
             product_name = product_list.item(item)["values"][0]
             if product_name in products:
@@ -156,7 +152,7 @@ def delete_selected():
         update_product_list()
         update_total_weight()
 
-# Función para editar un producto (nombre, restar peso y peso nuevo)
+# Editar producto
 def edit_product():
     selected_item = product_list.selection()
     if len(selected_item) != 1:
@@ -167,24 +163,21 @@ def edit_product():
 
     edit_window = tk.Toplevel(root)
     edit_window.title("Editar Producto")
-    edit_window.geometry("550x450")  # Ventana más grande
+    edit_window.geometry("550x450")
     edit_window.transient(root)
 
     tk.Label(edit_window, text=f"Producto actual: {product_name}", font=("Arial", 12, "bold")).pack(pady=5)
     tk.Label(edit_window, text=f"Peso actual: {current_weight:.2f} lb", font=("Arial", 12)).pack(pady=5)
 
-    # Campo para cambiar nombre
     tk.Label(edit_window, text="Nuevo Nombre:").pack(pady=5)
     new_name_entry = ttk.Entry(edit_window, font=("Arial", 11))
     new_name_entry.pack(pady=5, ipadx=5, ipady=5)
     new_name_entry.insert(0, product_name)
 
-    # Campo para restar peso
     tk.Label(edit_window, text="Restar peso (lb):").pack(pady=5)
     subtract_weight_entry = ttk.Entry(edit_window, font=("Arial", 11))
     subtract_weight_entry.pack(pady=5, ipadx=5, ipady=5)
 
-    # Campo para ingresar peso nuevo directamente
     tk.Label(edit_window, text="Peso Nuevo (lb):").pack(pady=5)
     new_weight_entry = ttk.Entry(edit_window, font=("Arial", 11))
     new_weight_entry.pack(pady=5, ipadx=5, ipady=5)
@@ -193,8 +186,6 @@ def edit_product():
         new_name = new_name_entry.get().strip() or product_name
         try:
             final_weight = current_weight
-
-            # Restar peso si se ingresó
             if subtract_weight_entry.get().strip():
                 subtract_value = float(subtract_weight_entry.get())
                 if subtract_value < 0:
@@ -203,7 +194,6 @@ def edit_product():
                 final_weight -= subtract_value
                 add_to_history("Peso Restado", f"{product_name} - {subtract_value:.2f} lb (Nuevo peso: {final_weight:.2f} lb)")
 
-            # Reemplazar con peso nuevo si se ingresó
             if new_weight_entry.get().strip():
                 new_weight = float(new_weight_entry.get())
                 if new_weight <= 0:
@@ -216,20 +206,13 @@ def edit_product():
                 messagebox.showerror("Error", "El peso final debe ser mayor a 0.")
                 return
 
-            save_undo_state()  # Guardamos estado antes de editar
-
-            # Eliminar producto original
+            save_undo_state()
             del products[product_name]
             product_names.discard(product_name)
 
-            # Si el nuevo nombre ya existe, sumamos el peso
-            if new_name in products:
-                products[new_name] += final_weight
-                add_to_history("Peso Sumado", f"{product_name} → {new_name} - +{final_weight:.2f} lb (Total: {products[new_name]:.2f} lb)")
-            else:
-                products[new_name] = final_weight
-                product_names.add(new_name)
-                add_to_history("Editado", f"{product_name} → {new_name} - {final_weight:.2f} lb")
+            products[new_name] = final_weight
+            product_names.add(new_name)
+            add_to_history("Editado", f"{product_name} → {new_name} - {final_weight:.2f} lb")
 
             update_product_list()
             update_total_weight()
@@ -237,17 +220,14 @@ def edit_product():
         except ValueError:
             messagebox.showerror("Error", "Por favor ingrese valores numéricos válidos.")
 
-    # Botón más grande y visible
     ttk.Button(edit_window, text="Guardar Cambios", command=save_edit).pack(pady=30, ipadx=15, ipady=8)
 
-# Función para registrar acciones en el historial
+# Historial
 history_log = []
-
 def add_to_history(action, details):
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     history_log.append({"fecha": timestamp.split()[0], "hora": timestamp.split()[1], "accion": action, "detalles": details})
 
-# Función para mostrar el historial
 def show_history():
     if not history_log:
         messagebox.showinfo("Historial", "No hay acciones registradas.")
@@ -268,7 +248,6 @@ def show_history():
     text_widget.pack(expand=True, fill="both", padx=10, pady=10)
 
     scrollbar.config(command=text_widget.yview)
-
     text_widget.insert("end", "=== HISTORIAL DE ACCIONES ===\n\n")
 
     last_date = ""
@@ -276,12 +255,55 @@ def show_history():
         if entry["fecha"] != last_date:
             last_date = entry["fecha"]
             text_widget.insert("end", f"\n📅 {last_date}:\n")
-
         text_widget.insert("end", f"  🕑 {entry['hora']} - {entry['accion']}: {entry['detalles']}\n")
 
     text_widget.config(state="disabled")
 
-# Configuración de la ventana principal
+# Importar PDF para editar (REEMPLAZAR lista actual)
+def import_pdf_to_edit():
+    file_path = filedialog.askopenfilename(
+        title="Seleccionar PDF para editar",
+        filetypes=[("PDF files", "*.pdf")]
+    )
+    if not file_path:
+        return
+
+    try:
+        from PyPDF2 import PdfReader
+        reader = PdfReader(file_path)
+        imported_products = {}
+        for page in reader.pages:
+            text = page.extract_text()
+            if not text:
+                continue
+            for line in text.split("\n"):
+                if ":" in line and "lb" in line:
+                    try:
+                        name, weight_text = line.split(":")
+                        weight = float(weight_text.strip().replace("lb", "").strip())
+                        imported_products[name.strip()] = weight
+                    except:
+                        continue
+
+        if not imported_products:
+            messagebox.showerror("Error", "No se encontraron productos válidos en el PDF.")
+            return
+
+        save_undo_state()
+        products.clear()
+        product_names.clear()
+        for name, weight in imported_products.items():
+            products[name] = weight
+            product_names.add(name)
+
+        update_product_list()
+        update_total_weight()
+        add_to_history("Importado", f"Lista reemplazada desde {os.path.basename(file_path)}")
+        messagebox.showinfo("Éxito", "Lista reemplazada exitosamente desde el PDF.")
+    except Exception as e:
+        messagebox.showerror("Error", f"No se pudo importar el PDF: {str(e)}")
+
+# Ventana principal
 root = tk.Tk()
 root.title("FDA")
 root.geometry("800x600")
@@ -290,7 +312,7 @@ root.minsize(600, 400)
 products = {}
 product_names = set()
 
-# Estilo profesional
+# Estilos
 style = ttk.Style()
 style.theme_use("clam")
 style.configure("TLabel", background="#E0E0E0", foreground="#333333", font=("Arial", 11))
@@ -298,7 +320,6 @@ style.configure("TButton", background="#6286f0", foreground="white", font=("Aria
 style.map("TButton", background=[("active", "#5679d6")])
 style.configure("Treeview", background="#FFFFFF", foreground="#333333", font=("Arial", 13), rowheight=25)
 style.configure("Treeview.Heading", font=("Arial", 13, "bold"), background="#DDDDDD")
-
 root.configure(bg="#E0E0E0")
 
 menu_frame = tk.Frame(root, bg="#333333", width=200)
@@ -306,6 +327,7 @@ menu_frame.grid(row=0, column=0, rowspan=3, sticky="nsw")
 
 buttons = [
     ("Exportar a PDF", export_to_pdf),
+    ("Importar PDF para Editar", import_pdf_to_edit),
     ("Limpiar Lista", clear_list),
     ("Eliminar Producto", delete_selected),
     ("Editar Producto", edit_product),
@@ -313,25 +335,21 @@ buttons = [
     ("Ver Historial", show_history),
     ("Salir", root.quit),
 ]
-
-for i, (text, command) in enumerate(buttons):
+for text, command in buttons:
     btn = tk.Button(menu_frame, text=text, command=command, bg="#333333", fg="white", font=("Arial", 10), relief="flat")
     btn.pack(fill="x", pady=5)
-    tk.Frame(menu_frame, height=2, bg="white").pack(fill="x")  # Línea blanca debajo
+    tk.Frame(menu_frame, height=2, bg="white").pack(fill="x")
     btn.bind("<Enter>", lambda e, b=btn: b.config(bg="#5679d6"))
     btn.bind("<Leave>", lambda e, b=btn: b.config(bg="#333333"))
 
 frame_top = tk.Frame(root, bg="#E0E0E0")
 frame_top.grid(row=0, column=1, padx=10, pady=10, sticky="ew")
-
 tk.Label(frame_top, text="Nombre del Producto:", bg="#E0E0E0").grid(row=0, column=0, sticky="w")
 product_name_entry = ttk.Combobox(frame_top, width=25)
 product_name_entry.grid(row=0, column=1, padx=5, pady=5)
-
 tk.Label(frame_top, text="Peso (lb):", bg="#E0E0E0").grid(row=1, column=0, sticky="w")
 product_weight_entry = ttk.Entry(frame_top, width=25)
 product_weight_entry.grid(row=1, column=1, padx=5, pady=5)
-
 add_button = ttk.Button(frame_top, text="Añadir Producto", command=add_product)
 add_button.grid(row=2, column=0, columnspan=2, pady=10)
 
@@ -350,13 +368,11 @@ root.grid_columnconfigure(1, weight=1)
 
 product_name_entry.bind("<Return>", lambda e: product_weight_entry.focus())
 product_weight_entry.bind("<Return>", add_product)
-
-# Ctrl+Z para deshacer
 root.bind("<Control-z>", undo_action)
 
 def auto_save():
     if root.winfo_exists():
-        save_session(False)  
+        save_session(False)
         root.after(10000, auto_save)
 
 load_session()
