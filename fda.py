@@ -207,12 +207,18 @@ def edit_product():
                 return
 
             save_undo_state()
-            del products[product_name]
-            product_names.discard(product_name)
-
-            products[new_name] = final_weight
-            product_names.add(new_name)
-            add_to_history("Editado", f"{product_name} → {new_name} - {final_weight:.2f} lb")
+            # Si el nuevo nombre ya existe, sumar los pesos
+            if new_name in products and new_name != product_name:
+                combined_weight = products[new_name] + final_weight
+                del products[product_name]
+                products[new_name] = combined_weight
+                add_to_history("Combinado", f"{product_name} → {new_name} (Peso combinado: {combined_weight:.2f} lb)")
+            else:
+                del products[product_name]
+                product_names.discard(product_name)
+                products[new_name] = final_weight
+                product_names.add(new_name)
+                add_to_history("Editado", f"{product_name} → {new_name} - {final_weight:.2f} lb")
 
             update_product_list()
             update_total_weight()
